@@ -1,4 +1,4 @@
-#define MAX 10
+#define MAX 20
 #define XYSIZE 13
 
 #include <stdio.h>
@@ -21,6 +21,7 @@ struct OBJ {
 
 OBJ Mine[MAX] = { NULL };
 OBJ Player;
+OBJ Loading[6];
 
 struct PROCESS {
 	bool flag = false;
@@ -46,6 +47,7 @@ void StartMenu();
 void GameStart();
 void Check_FlagToMine();
 void GUI();
+int randx();
 
 int main() {
 	
@@ -55,13 +57,14 @@ int main() {
 	// 게임 시작
 	StartMenu();
 
-	// 맵 생성
+	// 맵 초기화 및 생성
  	CreateMap();
 
 	// 맵에 지뢰 생성
+
 	CreateMine();
 
-	// 지뢰 주변 숫자 생성
+	// MineCnt 생성
 	CreateMinecnt();
 
 	// 게임 스타트
@@ -75,8 +78,10 @@ void Init() {
 	SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &cursorInfo);
 	srand(time(NULL));
 
+	// 화면 크기 조정
 	system("mode con cols=70 lines=13");
 
+	// 플레이어좌표 초기화
 	Player.x = 0;
 	Player.y = 0;
 }
@@ -87,20 +92,20 @@ void CreateMap() {
 			Map[i][j] = 0;
 			Front_map[i][j].flag = false;
 			Front_map[i][j].active = false;
+			MineCnt[i][j] = 0;
 		}
 	}
 }
 
 void CreateMine() {
-	for (int i = 0; i < MAX; i++) {
+	for (int i = 0,Cnt = 0; i < MAX; i++) {
 		while(1) {
 			MCheck = false;
-			srand(time(NULL));
-			Sleep(1000);
-			Mine[i].x = rand() % XYSIZE;
-			Mine[i].y = rand() % XYSIZE;
+
+			Mine[i].x = randx();
+			Mine[i].y = randx();
 			
-			// 전에 나온 값인지 체크
+			// 중복체크 체크
 			for (int j = 0; j < i; j++) {
 				if (Mine[i].x == Mine[j].x && Mine[i].y == Mine[j].y) {
 					MCheck = true;
@@ -108,34 +113,35 @@ void CreateMine() {
 				}
 			}
 
-			// 전에 나온 값과 겹치지 않을 경우
+			// 중복이 아닐 경우
 			if (MCheck == false) {
 				break;
 			}
 		}
+		// 맵에 적용
 		Map[Mine[i].y][Mine[i].x] = -5;
 	}
 }
 
 void CreateMinecnt() {
-	// 숫자 만들기
-	for (int TMPy = 0; TMPy < XYSIZE; TMPy++) {
-		for (int TMPx = 0; TMPx < XYSIZE; TMPx++) {
-			if (Map[TMPy][TMPx] == -5) continue;
-			for (int i = TMPx - 1; i < TMPx + 2; i++) {
-				if (i < 0 || i >= XYSIZE) continue;
-				for (int j = TMPy - 1; j < TMPy + 2; j++) {
-					if (j < 0 || j >= XYSIZE) continue;
-					if (Map[j][i] == -5) {
-						MineCnt[TMPy][TMPx]++;
+	// 지뢰개수 만들기
+	for (int y = 0; y < XYSIZE; y++) {
+		for (int x = 0; x < XYSIZE; x++) {
+			if (Map[y][x] != -5) {
+				for (int i = y - 1; i < y + 2; i++) {
+					if (i >= 0 && i < XYSIZE) {
+						for (int j = x - 1; j < x + 2; j++) {
+							if (j >= 0 && j < XYSIZE) {
+								if (Map[i][j] == -5) {
+									MineCnt[y][x]++;
+								}
+							}
+						}
 					}
 				}
+  				Map[y][x] = MineCnt[y][x]; 
 			}
-			// 숫자 적용
-			if (Map[TMPy][TMPx] != -5) {
-				Map[TMPy][TMPx] = MineCnt[TMPy][TMPx];
-			}
-		}
+		} 
 	}
 }
 
@@ -185,12 +191,13 @@ void DrawMap() {
 }
 
 void DrawPlayer() {
-	// 흰색 커서 지우기
+	// 흰색 커서 활성화
 	cursorInfo.bVisible = 1;
 	cursorInfo.dwSize = 1;
 	SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &cursorInfo);
 	srand(time(NULL));
 
+	// 커서 위치
 	SetColor(0, 15);
 	GotoXY(Player.x, Player.y);
 }
@@ -241,7 +248,7 @@ void InputProcess() {
 
 void MineCntFind(int Playerx, int Playery) {
 	int i, j;
-	// MineCnt 재귀
+
 	if (Playery < 0 || Playery >= XYSIZE) return;
 	if (Playerx < 0 || Playerx >= XYSIZE) return;
 	if (Front_map[Playery][Playerx].active) return;
@@ -260,6 +267,7 @@ void MineCntFind(int Playerx, int Playery) {
 }
 
 void GameOver(int N) {
+	// 전체 맵 보여주기
 	for (int i = 0; i < XYSIZE; i++) {
 		for (int j = 0; j < XYSIZE; j++) {
 			if (Front_map[i][j].active) continue;
@@ -269,6 +277,7 @@ void GameOver(int N) {
 	DrawMap();
 	Sleep(2000);
 
+	// 종료메뉴
 	while (1) {
 		Clear();
 		SetColor(0, 15);
@@ -277,9 +286,9 @@ void GameOver(int N) {
 		if (N == 0) printf("실패!");
 		else if (N == 1) printf("승리!");
 		
-		GotoXY(20, 6);
+		GotoXY(20, 7);
 		printf("시작메뉴로 가기 - 왼쪽ALT키");
-		GotoXY(26, 7);
+		GotoXY(26, 8);
 		printf("종료 - ESC키");
 
 		if (GetAsyncKeyState(VK_ESCAPE) && 0x8000) {
@@ -302,7 +311,7 @@ void StartMenu() {
 		GotoXY(20, 9);
 		printf("시작하려면 엔터키를 누르십시오");
 
-		if (GetAsyncKeyState(VK_RETURN) && 0x8000); {
+		if (GetAsyncKeyState(VK_RETURN) && 0x8000) {
 			break;
 		}
 		Sleep(100);
@@ -356,12 +365,30 @@ void GUI() {
 	printf("위 : ↑ / 아래 : ↓");
 	GotoXY(XYSIZE * 2 + 4, 9);
 	printf("깃발 : SPACE");
+	GotoXY(XYSIZE * 2 + 4, 10);
+	printf("지뢰확인 : LCTRL");
 	GotoXY(XYSIZE * 2 + 17, 1);
-	printf("지뢰 개수 : %d", XYSIZE);
+	printf("지뢰 개수 : %d", MAX);
 
 	// 흰색 커서 지우기
 	cursorInfo.bVisible = 0;
 	cursorInfo.dwSize = 1;
 	SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &cursorInfo);
 	srand(time(NULL));
+}
+
+// 랜덤
+int randx()
+{
+	static int flag = 0;
+	int retVal;
+	if (flag == 0)
+	{
+		srand(time(NULL));
+		rand(); rand(); rand(); rand();
+		srand(rand());
+		flag = 1;
+	}
+	retVal = rand() % XYSIZE;
+	return retVal;
 }
